@@ -13,4 +13,4 @@ g256sumfuncs.o: g256sumfuncs.cpp g256sum.h const.h
 	$(CC) $(CFLAGS) -c g256sumfuncs.cpp
 
 clean:
-	rm -rf *.o magma
+	rm -rf *.o g256sum
