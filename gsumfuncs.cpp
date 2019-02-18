@@ -1,6 +1,31 @@
-#include "g256sum.h"
+#include "gsum.h"
 #include "const.h"
-#include <stdio.h>
+//#include <stdio.h>
+//#include <iostream>
+
+size_t getFileSize(char *file) {
+    FILE *f;
+    f = fopen(file, "rb");
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    fclose(f);
+    return size;
+}
+
+void data_read(uint8_t *dest, char *file, size_t size) {
+    FILE *f;
+    if ((f = fopen(file, "rb")) == NULL) {
+        std::cerr << "File not opened!\n";
+    } else {
+        for (size_t i = 0; i < size; i++) {
+            uint8_t temp;
+            fread(&temp, 1, 1, f);
+            dest[i] = temp;
+        }
+        fclose(f);
+    }
+}
 
 void print_hash(struct ctx *p_ctx)
 {
@@ -172,11 +197,14 @@ void step3(struct ctx *hash_ctx, uint8_t *data, size_t size) {
 
     memset(temp, 0x00, BLOCK_SIZE);
     g_N(hash_ctx->h, hash_ctx->N, uintvec(temp, 0));
+
     memset(temp, 0x00, BLOCK_SIZE);
     g_N(hash_ctx->h, hash_ctx->S, uintvec(temp, 0));
 
-    if (!(hash_ctx->size)) {
-        memcpy(hash_ctx->h256, hash_ctx->h, BLOCK_SIZE / 2);
+    if (hash_ctx->size) {
+        memcpy(hash_ctx->h512, hash_ctx->h, BLOCK_SIZE);
+    } else {
+        memcpy(hash_ctx->h256, hash_ctx->h, BLOCK_SIZE);
     }
 }
 
@@ -192,6 +220,10 @@ void hash(struct ctx *hash_ctx, uint8_t *data, size_t size) {
     }
 }
 
-void finish(struct ctx *hash_ctx, uint8_t *ans256) {
-    memcpy(ans256, hash_ctx->h256, BLOCK_SIZE/2);
+void finish(struct ctx *hash_ctx, uint8_t *ans) {
+    if (hash_ctx->size) {
+        memcpy(ans, hash_ctx->h512, BLOCK_SIZE);
+    } else {
+        memcpy(ans, hash_ctx->h256, BLOCK_SIZE / 2);
+    }
 }

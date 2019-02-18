@@ -9,7 +9,11 @@
 #include "const.h"
 #include <cstdint>
 #include <string.h>
+#include <stdio.h>
+#include <iostream>
 
+size_t getFileSize(char *file);
+void data_read(uint8_t *dest, char *file, size_t size);
 uint8_t* uintvec(uint8_t *dest, uint32_t val);
 void L(uint8_t *dest);
 void P(uint8_t *dest);
