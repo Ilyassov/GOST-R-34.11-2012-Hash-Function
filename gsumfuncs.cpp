@@ -1,38 +1,24 @@
 #include "gsum.h"
 #include "const.h"
-//#include <stdio.h>
-//#include <iostream>
 
-size_t getFileSize(char *file) {
-    FILE *f;
-    f = fopen(file, "rb");
-    fseek(f, 0, SEEK_END);
-    size_t size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    fclose(f);
+void reverse(uint8_t *dest, size_t size) {
+    for (size_t i = 0; i < size / 2; i++) {
+        uint8_t temp = dest[i];
+        dest[i] = dest[size - i - 1];
+        dest[size - i - 1] = temp;
+    }
+}
+
+size_t data_read(FILE *f, uint8_t *dest) {
+    size_t size = 0;
+    memset(dest, 0x00, BLOCK_SIZE);
+    uint8_t temp;
+    while ((size != BLOCK_SIZE) and fread(&temp, 1, 1, f)) {
+        dest[size] = temp;
+        ++size;
+    }
+    reverse(dest, size);
     return size;
-}
-
-void data_read(uint8_t *dest, char *file, size_t size) {
-    FILE *f;
-    if ((f = fopen(file, "rb")) == NULL) {
-        std::cerr << "File not opened!\n";
-    } else {
-        for (size_t i = 0; i < size; i++) {
-            uint8_t temp;
-            fread(&temp, 1, 1, f);
-            dest[i] = temp;
-        }
-        fclose(f);
-    }
-}
-
-void print_hash(struct ctx *p_ctx)
-{
-    for (size_t i = 0; i < 64; i++) {
-        printf("%02x", p_ctx->h[i]);
-    }
-    putchar('\n');
 }
 
 void print_h(uint8_t *h, int k) {
@@ -42,8 +28,6 @@ void print_h(uint8_t *h, int k) {
     putchar('\n');
 }
 
-//Обнуляю N и S, а h заполняю в
-//зависимости от режима работы
 void init(struct ctx *init_ctx, size_t bit_size) {
     memset(init_ctx->N, 0x00, BLOCK_SIZE);
     memset(init_ctx->S, 0x00, BLOCK_SIZE);
@@ -51,9 +35,9 @@ void init(struct ctx *init_ctx, size_t bit_size) {
     init_ctx->size = bit_size;
 
     if (init_ctx->size) {
-        memcpy(init_ctx->h, IV_512, BLOCK_SIZE);
+        memset(init_ctx->h, IV_512, BLOCK_SIZE);
     } else {
-        memcpy(init_ctx->h, IV_256, BLOCK_SIZE);
+        memset(init_ctx->h, IV_256, BLOCK_SIZE);
     }
 }
 
@@ -111,7 +95,9 @@ void E(uint8_t *dest, uint8_t *K, uint8_t *m) {
 
     uint8_t Ki[BLOCK_SIZE];
     memcpy(Ki, K, BLOCK_SIZE);
+
     X(dest, Ki, m);
+
     for (int i = 1; i < 13; i++) {
 
         S(dest);
@@ -155,28 +141,7 @@ void mod512sum(uint8_t *dest, uint8_t* val1, uint8_t* val2) {
     }
 }
 
-void step2(struct ctx *hash_ctx, uint8_t *data, size_t size) {
-
-    uint8_t m[BLOCK_SIZE];
-    uint8_t temp[BLOCK_SIZE];
-
-    memcpy(m, data + size - BLOCK_SIZE, BLOCK_SIZE);
-
-    g_N(hash_ctx->h, m, hash_ctx->N);
-
-    memset(temp, 0x00, BLOCK_SIZE);
-    mod512sum(hash_ctx->N, hash_ctx->N, uintvec(temp, BLOCK_BIT_SIZE));
-    mod512sum(hash_ctx->S, hash_ctx->S, m);
-
-    if ((size -= BLOCK_SIZE) >= BLOCK_SIZE) {
-        step2(hash_ctx, data, size);
-    } else {
-        step3(hash_ctx, data, size);
-    }
-}
-
-void step3(struct ctx *hash_ctx, uint8_t *data, size_t size) {
-
+void hash(struct ctx *hash_ctx, uint8_t *data, size_t size) {
     uint8_t m[BLOCK_SIZE];
     uint8_t temp[BLOCK_SIZE];
 
@@ -185,16 +150,19 @@ void step3(struct ctx *hash_ctx, uint8_t *data, size_t size) {
     if (diff) {
         memset(m, 0x00, diff - 1);
 		memset(m + diff - 1, 0x01, 1);
-		memcpy(m + diff, data, size);
     }
+    memcpy(m + diff, data, size);
 
     g_N(hash_ctx->h, m, hash_ctx->N);
 
-    mod512sum(hash_ctx->S, m, hash_ctx->S);
-
     memset(temp, 0x00, BLOCK_SIZE);
     mod512sum(hash_ctx->N, hash_ctx->N, uintvec(temp, size*8));
+    mod512sum(hash_ctx->S, m, hash_ctx->S);
+}
 
+void finish(struct ctx *hash_ctx, uint8_t *ans) {
+
+    uint8_t temp[BLOCK_SIZE];
     memset(temp, 0x00, BLOCK_SIZE);
     g_N(hash_ctx->h, hash_ctx->N, uintvec(temp, 0));
 
@@ -202,28 +170,8 @@ void step3(struct ctx *hash_ctx, uint8_t *data, size_t size) {
     g_N(hash_ctx->h, hash_ctx->S, uintvec(temp, 0));
 
     if (hash_ctx->size) {
-        memcpy(hash_ctx->h512, hash_ctx->h, BLOCK_SIZE);
+        memcpy(ans, hash_ctx->h, BLOCK_SIZE);
     } else {
-        memcpy(hash_ctx->h256, hash_ctx->h, BLOCK_SIZE);
-    }
-}
-
-void hash(struct ctx *hash_ctx, uint8_t *data, size_t size) {
-    uint8_t ans512[BLOCK_SIZE];
-    uint8_t ans256[BLOCK_SIZE / 2];
-    memset(ans512, 0x00, BLOCK_SIZE);
-    memset(ans256, 0x00, BLOCK_SIZE / 2);
-    if (size < BLOCK_SIZE) {
-        step3(hash_ctx, data, size);
-    } else {
-        step2(hash_ctx, data, size);
-    }
-}
-
-void finish(struct ctx *hash_ctx, uint8_t *ans) {
-    if (hash_ctx->size) {
-        memcpy(ans, hash_ctx->h512, BLOCK_SIZE);
-    } else {
-        memcpy(ans, hash_ctx->h256, BLOCK_SIZE / 2);
+        memcpy(ans, hash_ctx->h, BLOCK_SIZE / 2);
     }
 }

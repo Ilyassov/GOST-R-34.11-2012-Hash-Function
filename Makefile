@@ -1,6 +1,8 @@
 CC=g++
 CFLAGS=-c -Wall
 
+all:	g512sum g256sum
+
 g512sum:	g512sum.o gsumfuncs.o
 	$(CC) g512sum.cpp gsumfuncs.cpp -o g512sum
 

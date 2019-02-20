@@ -2,18 +2,29 @@
 
 int main(int argc, char *argv[]) {
     try {
-        size_t file_size = getFileSize(argv[1]);
-        uint8_t data[file_size];
-        data_read(data, argv[1], file_size);
-        uint8_t ans256[BLOCK_SIZE / 2];
-        memset(ans256, 0x00, BLOCK_SIZE / 2);
+
+        uint8_t data[BLOCK_SIZE];
+        int size, i = 0;
+        uint8_t digest[BLOCK_SIZE / 2];
+        memset(digest, 0x00, BLOCK_SIZE / 2);
         struct ctx hash_ctx;
 
-        init(&hash_ctx, HASH256);
-        hash(&hash_ctx, data, sizeof(data));
-        finish(&hash_ctx, ans256);
-        print_h(ans256, BLOCK_SIZE / 2);
+        FILE *f;
+        if ((f = fopen(argv[1], "rb")) == NULL) {
+            std::cerr << "File not opened!\n";
+        }
 
+        init(&hash_ctx, HASH256);
+
+        while (!feof(f)) {
+            size = data_read(f, data);
+            hash(&hash_ctx, data, size);
+            i++;
+        }
+
+        finish(&hash_ctx, digest);
+        print_h(digest, BLOCK_SIZE / 2);
+        fclose(f);
     }
     catch(...) {
         std::cerr << "Error!\n";

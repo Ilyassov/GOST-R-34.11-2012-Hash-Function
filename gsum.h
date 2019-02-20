@@ -5,6 +5,8 @@
 #define BLOCK_BIT_SIZE  (BLOCK_SIZE * 8)
 #define HASH256         0
 #define HASH512         1
+#define IV_512          0x00
+#define IV_256          0x01
 
 #include "const.h"
 #include <cstdint>
@@ -12,8 +14,8 @@
 #include <stdio.h>
 #include <iostream>
 
-size_t getFileSize(char *file);
-void data_read(uint8_t *dest, char *file, size_t size);
+void reverse(uint8_t *dest, size_t size);
+size_t data_read(FILE *f, uint8_t *dest);
 uint8_t* uintvec(uint8_t *dest, uint32_t val);
 void L(uint8_t *dest);
 void P(uint8_t *dest);
@@ -36,8 +38,6 @@ void print_h(uint8_t *h, int k);
 
 struct ctx {
     uint8_t h[BLOCK_SIZE];
-    uint8_t h256[BLOCK_SIZE/2];
-    uint8_t h512[BLOCK_SIZE];
     uint8_t N[BLOCK_SIZE];
     uint8_t S[BLOCK_SIZE];
     uint8_t size;
