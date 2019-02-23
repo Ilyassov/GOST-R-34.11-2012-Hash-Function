@@ -1,10 +1,22 @@
 #include "gsum.h"
 
+void make_calc(struct ctx *hash_ctx, uint8_t *data, int size,
+               uint8_t *digest, FILE * f) {
+    init(hash_ctx, HASH512);
+
+    while ((size = data_read(f, data))) {
+        update(hash_ctx, data, size);
+    }
+
+    finish(hash_ctx, digest);
+    print_h(digest, BLOCK_SIZE);
+}
+
 int main(int argc, char *argv[]) {
     try {
 
         uint8_t data[BLOCK_SIZE];
-        int size, i = 0;
+        int size = 0;
         uint8_t digest[BLOCK_SIZE];
         memset(digest, 0x00, BLOCK_SIZE);
         struct ctx hash_ctx;
@@ -14,16 +26,8 @@ int main(int argc, char *argv[]) {
             std::cerr << "File not opened!\n";
         }
 
-        init(&hash_ctx, HASH512);
+        make_calc(&hash_ctx, data, size, digest, f);
 
-        while (!feof(f)) {
-            size = data_read(f, data);
-            hash(&hash_ctx, data, size);
-            i++;
-        }
-
-        finish(&hash_ctx, digest);
-        print_h(digest, BLOCK_SIZE);
         fclose(f);
     }
     catch(...) {

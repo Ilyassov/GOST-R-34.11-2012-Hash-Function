@@ -12,12 +12,7 @@ void reverse(uint8_t *dest, size_t size) {
 size_t data_read(FILE *f, uint8_t *dest) {
     size_t size = 0;
     memset(dest, 0x00, BLOCK_SIZE);
-    uint8_t temp;
-    while ((size != BLOCK_SIZE) and fread(&temp, 1, 1, f)) {
-        dest[size] = temp;
-        ++size;
-    }
-    reverse(dest, size);
+    size = fread(dest, sizeof(uint8_t), BLOCK_SIZE, f);
     return size;
 }
 
@@ -29,13 +24,12 @@ void print_h(uint8_t *h, int k) {
 }
 
 void init(struct ctx *init_ctx, size_t bit_size) {
-    memset(init_ctx->N, 0x00, BLOCK_SIZE);
-    memset(init_ctx->S, 0x00, BLOCK_SIZE);
+    memset(init_ctx, 0, sizeof(*init_ctx));
 
     init_ctx->size = bit_size;
 
     if (init_ctx->size) {
-        memset(init_ctx->h, IV_512, BLOCK_SIZE);
+        memset(init_ctx->h, IV_512, BLOCK_SIZE  );
     } else {
         memset(init_ctx->h, IV_256, BLOCK_SIZE);
     }
@@ -105,9 +99,11 @@ void E(uint8_t *dest, uint8_t *K, uint8_t *m) {
         L(dest);
 
         xor_512(Ki, Ki, C[i-1]);
+
         S(Ki);
         P(Ki);
         L(Ki);
+
         X(dest, Ki, dest);
     }
 }
@@ -117,10 +113,13 @@ void g_N(uint8_t *h, uint8_t *m, uint8_t *N) {
     memcpy(h0, h, BLOCK_SIZE);
 
     xor_512(h, h, N);
+
     S(h);
     P(h);
     L(h);
+
     E(h, h, m);
+
     xor_512(h, h, h0);
 	xor_512(h, h, m);
 }
@@ -141,26 +140,57 @@ void mod512sum(uint8_t *dest, uint8_t* val1, uint8_t* val2) {
     }
 }
 
-void hash(struct ctx *hash_ctx, uint8_t *data, size_t size) {
-    uint8_t m[BLOCK_SIZE];
+void hash(struct ctx *hash_ctx) {
+
+    g_N(hash_ctx->h, hash_ctx->buf, hash_ctx->N);
     uint8_t temp[BLOCK_SIZE];
 
-    int diff = BLOCK_SIZE - size;
+    memset(temp, 0x00, BLOCK_SIZE);
 
+    memset(temp, 0x00, BLOCK_SIZE);
+
+    mod512sum(hash_ctx->N, hash_ctx->N, uintvec(temp, hash_ctx->buf_size * 8));
+    mod512sum(hash_ctx->S, hash_ctx->buf, hash_ctx->S);
+}
+
+void update(struct ctx *update_ctx, uint8_t *data, size_t size) {
+    if (update_ctx->buf_size) {
+        size_t len = 64 - update_ctx->buf_size;
+        if (len < size) {
+            memcpy(update_ctx->buf + update_ctx->buf_size, data, len);
+            reverse(update_ctx->buf, BLOCK_SIZE);
+            hash(update_ctx);
+            memset(update_ctx->buf, 0x00, BLOCK_SIZE);
+            update_ctx->buf_size = 0;
+            update(update_ctx, data+len, size-len);
+        } else {
+            memcpy(update_ctx->buf + update_ctx->buf_size, data, size);
+            update_ctx->buf_size += size;
+        }
+    } else {
+        memcpy(update_ctx->buf, data, size);
+        update_ctx->buf_size = size;
+    }
+    if (update_ctx->buf_size == BLOCK_SIZE) {
+        reverse(update_ctx->buf, BLOCK_SIZE);
+        hash(update_ctx);
+        memset(update_ctx->buf, 0x00, BLOCK_SIZE);
+        update_ctx->buf_size = 0;
+    }
+}
+
+void finish(struct ctx *hash_ctx, uint8_t *ans) {
+
+    reverse(hash_ctx->buf, hash_ctx->buf_size);
+    int diff = BLOCK_SIZE - hash_ctx->buf_size;
+    uint8_t m[BLOCK_SIZE];
     if (diff) {
         memset(m, 0x00, diff - 1);
 		memset(m + diff - 1, 0x01, 1);
     }
-    memcpy(m + diff, data, size);
-
-    g_N(hash_ctx->h, m, hash_ctx->N);
-
-    memset(temp, 0x00, BLOCK_SIZE);
-    mod512sum(hash_ctx->N, hash_ctx->N, uintvec(temp, size*8));
-    mod512sum(hash_ctx->S, m, hash_ctx->S);
-}
-
-void finish(struct ctx *hash_ctx, uint8_t *ans) {
+    memcpy(m + diff, hash_ctx->buf, hash_ctx->buf_size);
+    memcpy(hash_ctx->buf, m, BLOCK_SIZE);
+    hash(hash_ctx);
 
     uint8_t temp[BLOCK_SIZE];
     memset(temp, 0x00, BLOCK_SIZE);
