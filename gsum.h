@@ -25,8 +25,8 @@ void X(uint8_t *dest, uint8_t *x1, uint8_t *x2);
 void E(uint8_t *dest, uint8_t *K, uint8_t *m);
 
 void g_N(uint8_t *h, uint8_t *m, uint8_t *N);
-void step2(struct ctx *hash_ctx, uint8_t *data, size_t size);
-void step3(struct ctx *hash_ctx, uint8_t *data, size_t size);
+//void step2(struct ctx *hash_ctx, uint8_t *data, size_t size);
+//void step3(struct ctx *hash_ctx, uint8_t *data, size_t size);
 
 void init(struct ctx *init_ctx, size_t bit_size);
 void update(struct ctx *update_ctx, uint8_t *data, size_t size);
